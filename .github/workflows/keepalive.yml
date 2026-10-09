@@ -1,0 +1,16 @@
+name: Mantener activo Supabase
+
+on:
+  schedule:
+    - cron: '17 13 * * *'   # todos los días, ~8:17 am hora Colombia
+  workflow_dispatch: {}      # permite probarlo manualmente desde la pestaña "Actions"
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Visitar Supabase para mantenerlo activo
+        run: |
+          curl -s -o /dev/null -w "Respuesta de Supabase: %{http_code}\n" \
+            -H "apikey: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1lY2Vic2xnd2hjcWhhbnRjeXp4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE0ODg2MDUsImV4cCI6MjEwNzA2NDYwNX0.R1J-Ly37Tvodrt2xcbQ31HgFv8KsvB9MJBMuiP0XL0A" \
+            "https://mecebslgwhcqhantcyzx.supabase.co/rest/v1/"
