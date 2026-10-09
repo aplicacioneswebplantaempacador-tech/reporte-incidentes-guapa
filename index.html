@@ -1,0 +1,497 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Formulario de Reporte de Incidente de Trabajo — Agrícola Guapa</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<style>
+  :root{
+    --surface:#fcfcfb; --page:#f3f4f1; --ink:#0b0b0b; --ink-2:#52514e; --muted:#898781;
+    --line:#e1e0d9; --accent:#2a78d6; --accent-dark:#184f95; --good:#0ca30c; --bad:#d03b3b;
+    font-size:16px;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0; background:var(--page); color:var(--ink); font-family:system-ui,-apple-system,"Segoe UI",sans-serif; line-height:1.45;}
+  header.topbar{background:#1a3a1a; color:#fff; padding:18px 20px;}
+  header.topbar h1{margin:0; font-size:1.15rem;}
+  header.topbar p{margin:4px 0 0; font-size:.85rem; color:#d7e4d7;}
+  main{max-width:760px; margin:0 auto; padding:20px 16px 60px;}
+  .card{background:var(--surface); border:1px solid var(--line); border-radius:10px; padding:20px; margin-bottom:18px;}
+  .intro p{font-size:.92rem; color:var(--ink-2); margin:0 0 10px;}
+  .intro b{color:var(--ink);}
+  fieldset{border:0; padding:0; margin:0 0 22px;}
+  legend, .qlabel{font-weight:600; font-size:.96rem; margin-bottom:8px; display:block;}
+  .req::after{content:" *"; color:var(--bad);}
+  .hint{font-size:.82rem; color:var(--muted); margin:2px 0 8px;}
+  input[type=text], input[type=date], textarea{
+    width:100%; padding:10px 12px; border:1px solid var(--line); border-radius:8px;
+    font-size:.95rem; font-family:inherit; background:#fff; color:var(--ink);
+  }
+  textarea{min-height:70px; resize:vertical;}
+  .options{display:flex; flex-direction:column; gap:6px;}
+  .options.row{flex-direction:row; flex-wrap:wrap; gap:8px;}
+  .opt{display:flex; align-items:center; gap:8px; font-size:.92rem;}
+  .opt input{width:16px; height:16px;}
+  .pill-group{display:flex; gap:8px; flex-wrap:wrap;}
+  .pill-group input{position:absolute; opacity:0; width:0; height:0;}
+  .pill-group label{
+    border:1px solid var(--line); border-radius:999px; padding:8px 18px; font-size:.9rem;
+    cursor:pointer; background:#fff; color:var(--ink-2);
+  }
+  .pill-group input:checked + label{background:var(--accent); border-color:var(--accent); color:#fff;}
+  button.primary{
+    background:var(--accent); color:#fff; border:0; border-radius:8px; padding:13px 22px;
+    font-size:1rem; font-weight:600; cursor:pointer; width:100%;
+  }
+  button.primary:hover{background:var(--accent-dark);}
+  button.secondary{background:#fff; border:1px solid var(--line); border-radius:8px; padding:8px 14px; cursor:pointer; font-size:.85rem;}
+  #successMsg{display:none; background:#eafaea; border:1px solid var(--good); color:#0a5a0a; padding:14px 16px; border-radius:8px; margin-bottom:16px; font-size:.92rem;}
+  #errorMsg{display:none; background:#fcebea; border:1px solid var(--bad); color:#7a1f1f; padding:14px 16px; border-radius:8px; margin-bottom:16px; font-size:.92rem;}
+  footer{max-width:760px; margin:0 auto; padding:10px 16px 40px; text-align:right;}
+  footer a{color:var(--muted); font-size:.78rem; text-decoration:none;}
+  footer a:hover{text-decoration:underline;}
+
+  /* Modal de acceso */
+  .modal-bg{display:none; position:fixed; inset:0; background:rgba(11,11,11,.45); align-items:center; justify-content:center; padding:16px; z-index:50;}
+  .modal{background:#fff; border-radius:10px; padding:24px; width:100%; max-width:340px;}
+  .modal h2{margin:0 0 14px; font-size:1.05rem;}
+  .modal input{margin-bottom:10px;}
+  .modal-actions{display:flex; gap:8px; margin-top:6px;}
+  .modal-actions button{flex:1;}
+  #loginError{color:var(--bad); font-size:.82rem; display:none; margin-bottom:8px;}
+
+  /* Panel */
+  #panelView{display:none;}
+  .tabs{display:flex; gap:8px; max-width:760px; margin:0 auto; padding:14px 16px 0;}
+  .tabs button{background:none; border:0; border-bottom:3px solid transparent; padding:8px 4px; font-size:.95rem; font-weight:600; color:var(--muted); cursor:pointer;}
+  .tabs button.active{color:var(--ink); border-color:var(--accent);}
+  #tabsBar{display:none;}
+  .stat-row{display:flex; gap:12px; flex-wrap:wrap; margin-bottom:18px;}
+  .stat-tile{flex:1; min-width:140px; background:var(--surface); border:1px solid var(--line); border-radius:10px; padding:16px;}
+  .stat-tile .n{font-size:1.8rem; font-weight:700; color:var(--ink);}
+  .stat-tile .l{font-size:.8rem; color:var(--muted);}
+  .chart-wrap{position:relative; height:260px; margin-bottom:10px;}
+  .panel-head{display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;}
+  table.recent{width:100%; border-collapse:collapse; font-size:.85rem;}
+  table.recent th, table.recent td{text-align:left; padding:8px 6px; border-bottom:1px solid var(--line);}
+  table.recent th{color:var(--muted); font-weight:600;}
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <h1>🍍 Agrícola Guapa S.A.S.</h1>
+  <p>Formulario de Reporte de Incidente de Trabajo (IT)</p>
+</header>
+
+<div id="tabsBar" class="tabs">
+  <button id="tabFormBtn" class="active">Formulario</button>
+  <button id="tabPanelBtn">Panel</button>
+  <button id="logoutBtn" class="secondary" style="margin-left:auto;">Cerrar sesión</button>
+</div>
+
+<main id="formView">
+  <div class="card intro">
+    <p>El presente <b>Formulario de Reporte de Incidente de Trabajo (IT)</b> ha sido diseñado por <b>Agrícola Guapa S.A.S.</b> como una herramienta para facilitar el reporte oportuno de eventos que ocurran durante el desarrollo de las actividades laborales que <b>no generan lesión o afectación a la salud de los trabajadores, pero que pudieron haberlo hecho</b>.</p>
+    <p>Su diligenciamiento permite recopilar información relacionada con las circunstancias en las que ocurrió el evento, la actividad que se estaba desarrollando, las condiciones presentes, las personas involucradas y las acciones inmediatas realizadas. Esta información será utilizada como insumo para la <b>identificación de peligros, análisis de causas, definición de acciones preventivas y correctivas y fortalecimiento de la cultura de prevención</b> dentro de la compañía.</p>
+    <p>El reporte deberá realizarse de manera <b>clara, completa y veraz</b>, describiendo los hechos tal como ocurrieron y evitando realizar suposiciones sobre las causas del evento.</p>
+    <p>La información registrada será revisada por el área de SST, quien realizará la valoración y clasificación correspondiente del evento y determinará las acciones de intervención necesarias.</p>
+    <p><b>Recuerda:</b> reportar oportunamente nos permite prevenir que un incidente se convierta en un accidente.</p>
+  </div>
+
+  <div id="successMsg">✔ Reporte enviado correctamente. Gracias por reportar.</div>
+  <div id="errorMsg">No se pudo enviar el reporte. Por favor intenta de nuevo.</div>
+
+  <form id="incidentForm" class="card">
+
+    <fieldset>
+      <label class="qlabel req">1. Fecha del reporte</label>
+      <input type="date" name="fecha_reporte" required />
+    </fieldset>
+
+    <fieldset>
+      <label class="qlabel req">2. Nombre completo de quien realiza el reporte</label>
+      <input type="text" name="nombre_reporta" required />
+    </fieldset>
+
+    <fieldset>
+      <label class="qlabel req">3. Cargo</label>
+      <input type="text" name="cargo" required />
+    </fieldset>
+
+    <fieldset>
+      <label class="qlabel req">4. # Identificación</label>
+      <input type="text" name="identificacion" required />
+    </fieldset>
+
+    <fieldset>
+      <label class="qlabel req">5. Área</label>
+      <div class="options" data-name="area">
+        <!-- generado por JS -->
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <label class="qlabel req">6. Sede donde ocurrió el evento</label>
+      <div class="options" data-name="sede"></div>
+    </fieldset>
+
+    <fieldset>
+      <label class="qlabel req">7. Información del evento — Fecha en la que ocurrió el evento</label>
+      <input type="date" name="fecha_evento" required />
+    </fieldset>
+
+    <fieldset>
+      <label class="qlabel">8. Hora aproximada en la que ocurrió</label>
+      <input type="text" name="hora_evento" placeholder="Ej: 2:30 p.m." />
+    </fieldset>
+
+    <fieldset>
+      <label class="qlabel">9. ¿Qué actividad se estaba realizando en el momento del evento?</label>
+      <input type="text" name="actividad" />
+    </fieldset>
+
+    <fieldset>
+      <label class="qlabel">10. Describa detalladamente qué ocurrió</label>
+      <div class="hint">Describa los hechos en el orden en que ocurrieron, qué sucedió y qué elementos o condiciones estaban presentes</div>
+      <textarea name="descripcion"></textarea>
+    </fieldset>
+
+    <fieldset>
+      <label class="qlabel">11. Personas involucradas — ¿El evento involucró directamente a un trabajador?</label>
+      <div class="pill-group" data-name="involucro_trabajador">
+        <input type="radio" id="it_si" name="involucro_trabajador" value="SI"><label for="it_si">SI</label>
+        <input type="radio" id="it_no" name="involucro_trabajador" value="NO"><label for="it_no">NO</label>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <label class="qlabel">12. Nombre completo del trabajador involucrado</label>
+      <input type="text" name="nombre_trabajador" />
+    </fieldset>
+
+    <fieldset>
+      <label class="qlabel">13. Empresa a la que pertenece</label>
+      <div class="options" data-name="empresa"></div>
+    </fieldset>
+
+    <fieldset>
+      <label class="qlabel">14. ¿Hubo personas que presenciaron el evento?</label>
+      <div class="pill-group" data-name="hubo_testigos">
+        <input type="radio" id="ht_si" name="hubo_testigos" value="Si"><label for="ht_si">Si</label>
+        <input type="radio" id="ht_no" name="hubo_testigos" value="No"><label for="ht_no">No</label>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <label class="qlabel">15. Nombre(s) de los testigos</label>
+      <input type="text" name="testigos" />
+    </fieldset>
+
+    <fieldset>
+      <label class="qlabel">16. ¿Qué elementos, equipos o condiciones estaban presentes cuando ocurrió el evento?</label>
+      <div class="options" data-name="elemento_condicion"></div>
+    </fieldset>
+
+    <fieldset>
+      <label class="qlabel">17. Observaciones Detalladas</label>
+      <input type="text" name="observaciones" />
+    </fieldset>
+
+    <fieldset>
+      <label class="qlabel">18. ¿Observó alguna condición que pudiera generar un accidente?</label>
+      <div class="options row" data-name="condicion_insegura"></div>
+    </fieldset>
+
+    <fieldset>
+      <label class="qlabel">19. Describa la condición observada</label>
+      <input type="text" name="descripcion_condicion" />
+    </fieldset>
+
+    <fieldset>
+      <label class="qlabel">20. ¿Observó algún comportamiento o situación que pudiera haber contribuido al evento?</label>
+      <div class="options row" data-name="comportamiento_contribuyo"></div>
+    </fieldset>
+
+    <fieldset>
+      <label class="qlabel">21. Describa el comportamiento o situación observada</label>
+      <input type="text" name="descripcion_comportamiento" />
+    </fieldset>
+
+    <fieldset>
+      <label class="qlabel">22. Consecuencia potencial — ¿Qué pudo haber ocurrido como consecuencia del evento?</label>
+      <div class="options" data-name="consecuencia_potencial"></div>
+    </fieldset>
+
+    <fieldset>
+      <label class="qlabel">23. ¿Qué parte del cuerpo pudo haber resultado afectada?</label>
+      <div class="options" data-name="parte_cuerpo"></div>
+    </fieldset>
+
+    <fieldset>
+      <label class="qlabel">24. ¿Qué acción se realizó inmediatamente después del evento?</label>
+      <div class="hint">Indique qué se hizo, quién realizó la acción y, si aplica, cómo quedó controlada la situación</div>
+      <input type="text" name="accion_inmediata" />
+    </fieldset>
+
+    <button type="submit" class="primary" id="submitBtn">Enviar</button>
+  </form>
+</main>
+
+<main id="panelView">
+  <div class="panel-head">
+    <h2 style="margin:0;">Panel de incidentes</h2>
+  </div>
+
+  <div class="stat-row">
+    <div class="stat-tile"><div class="n" id="statTotal">—</div><div class="l">Eventos totales</div></div>
+    <div class="stat-tile"><div class="n" id="statMonth">—</div><div class="l">Este mes</div></div>
+    <div class="stat-tile"><div class="n" id="statWeek">—</div><div class="l">Últimos 7 días</div></div>
+  </div>
+
+  <div class="card">
+    <div class="qlabel">Eventos por área</div>
+    <div class="chart-wrap"><canvas id="chartArea"></canvas></div>
+  </div>
+
+  <div class="card">
+    <div class="qlabel">Eventos por sede / finca</div>
+    <div class="chart-wrap"><canvas id="chartSede"></canvas></div>
+  </div>
+
+  <div class="card">
+    <div class="qlabel">Consecuencia potencial</div>
+    <div class="chart-wrap"><canvas id="chartConsecuencia"></canvas></div>
+  </div>
+
+  <div class="card">
+    <div class="qlabel">Elementos / condiciones presentes</div>
+    <div class="chart-wrap"><canvas id="chartElemento"></canvas></div>
+  </div>
+
+  <div class="card">
+    <div class="qlabel">Últimos reportes</div>
+    <div style="overflow-x:auto;">
+      <table class="recent">
+        <thead><tr><th>Fecha evento</th><th>Área</th><th>Sede</th><th>Descripción</th></tr></thead>
+        <tbody id="recentBody"></tbody>
+      </table>
+    </div>
+  </div>
+</main>
+
+<footer><a href="#" id="accessLink">Acceso</a></footer>
+
+<div class="modal-bg" id="loginModalBg">
+  <div class="modal">
+    <h2>Acceso al panel</h2>
+    <div id="loginError">Correo o contraseña incorrectos.</div>
+    <input type="text" id="loginEmail" placeholder="Correo" autocomplete="username" />
+    <input type="password" id="loginPassword" placeholder="Contraseña" autocomplete="current-password" />
+    <div class="modal-actions">
+      <button class="secondary" id="loginCancel">Cancelar</button>
+      <button class="primary" id="loginSubmit" style="flex:2;">Entrar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* =========================================================
+   CONFIGURA ESTOS DOS VALORES ANTES DE PUBLICAR (Paso 7 de la guía)
+   Los encuentras en Supabase → Project Settings → API
+   ========================================================= */
+const SUPABASE_URL = 'https://mecebslgwhcqhantcyzx.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1lY2Vic2xnd2hjcWhhbnRjeXp4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE0ODg2MDUsImV4cCI6MjEwNzA2NDYwNX0.R1J-Ly37Tvodrt2xcbQ31HgFv8KsvB9MJBMuiP0XL0A';
+
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+/* ---------- Opciones de las preguntas de selección única ---------- */
+const OPTIONS = {
+  area: ['Administración','Almacén','Aplicaciones','CT&A','Cosecha','Desarrollo de cultivo','Despachos','Empaque','Operadores','Preparación','Semillero','Siembra','Taller','Punto Venta','Soporte y Control ( Maquinarias)'],
+  sede: ['La Fe','Jamaica','Egipto','Las Américas','Brasil','Argentina','Punto de Venta'],
+  empresa: ['Agrícola Guapa S.A.S.','Enlace Total','Unaltrapec','Contratista'],
+  elemento_condicion: ['Herramientas','Máquinas','Vehículos','EPP','Superficies / pisos','Vías de circulación','Condiciones locativas','Orden y aseo','Condiciones ambientales','Materiales u objetos'],
+  condicion_insegura: ['Si','No','No Sabe'],
+  comportamiento_contribuyo: ['Si','No','No Sabe'],
+  consecuencia_potencial: ['Caída al mismo nivel','Caída a diferente nivel','Golpe por objetos','Golpe contra objetos','Atrapamiento','Cortadura','Quemadura','Exposición a sustancias químicas','No se identifica consecuencia potencial'],
+  parte_cuerpo: ['Cabeza','Ojos','Cuello','Hombros','Brazos','Manos / dedos','Espalda','Cadera','Piernas','Rodillas','Pies / tobillos']
+};
+
+document.querySelectorAll('.options[data-name]').forEach(container => {
+  const name = container.dataset.name;
+  OPTIONS[name].forEach((opt, i) => {
+    const id = name + '_' + i;
+    const div = document.createElement('div');
+    div.className = 'opt';
+    div.innerHTML = `<input type="radio" id="${id}" name="${name}" value="${opt}"><label for="${id}">${opt}</label>`;
+    container.appendChild(div);
+  });
+});
+
+/* ---------- Envío del formulario ---------- */
+const form = document.getElementById('incidentForm');
+const successMsg = document.getElementById('successMsg');
+const errorMsg = document.getElementById('errorMsg');
+
+form.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  successMsg.style.display = 'none';
+  errorMsg.style.display = 'none';
+
+  const fd = new FormData(form);
+  const payload = Object.fromEntries(fd.entries());
+  // Los campos vacíos opcionales se guardan como null en vez de cadena vacía
+  Object.keys(payload).forEach(k => { if (payload[k] === '') payload[k] = null; });
+
+  const submitBtn = document.getElementById('submitBtn');
+  submitBtn.disabled = true;
+  submitBtn.textContent = 'Enviando...';
+
+  const { error } = await sb.from('incident_reports').insert([payload]);
+
+  submitBtn.disabled = false;
+  submitBtn.textContent = 'Enviar';
+
+  if (error) {
+    console.error(error);
+    errorMsg.style.display = 'block';
+  } else {
+    successMsg.style.display = 'block';
+    form.reset();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+});
+
+/* ---------- Acceso / panel oculto ---------- */
+const accessLink = document.getElementById('accessLink');
+const loginModalBg = document.getElementById('loginModalBg');
+const loginCancel = document.getElementById('loginCancel');
+const loginSubmit = document.getElementById('loginSubmit');
+const loginError = document.getElementById('loginError');
+const tabsBar = document.getElementById('tabsBar');
+const tabFormBtn = document.getElementById('tabFormBtn');
+const tabPanelBtn = document.getElementById('tabPanelBtn');
+const logoutBtn = document.getElementById('logoutBtn');
+const formView = document.getElementById('formView');
+const panelView = document.getElementById('panelView');
+
+accessLink.addEventListener('click', (e) => {
+  e.preventDefault();
+  loginModalBg.style.display = 'flex';
+});
+loginCancel.addEventListener('click', () => { loginModalBg.style.display = 'none'; });
+
+loginSubmit.addEventListener('click', async () => {
+  const email = document.getElementById('loginEmail').value.trim();
+  const password = document.getElementById('loginPassword').value;
+  loginError.style.display = 'none';
+  const { error } = await sb.auth.signInWithPassword({ email, password });
+  if (error) {
+    loginError.style.display = 'block';
+    return;
+  }
+  loginModalBg.style.display = 'none';
+  document.getElementById('loginEmail').value = '';
+  document.getElementById('loginPassword').value = '';
+});
+
+logoutBtn.addEventListener('click', async () => {
+  await sb.auth.signOut();
+});
+
+function showForm() {
+  formView.style.display = 'block';
+  panelView.style.display = 'none';
+  tabFormBtn.classList.add('active');
+  tabPanelBtn.classList.remove('active');
+}
+function showPanel() {
+  formView.style.display = 'none';
+  panelView.style.display = 'block';
+  tabFormBtn.classList.remove('active');
+  tabPanelBtn.classList.add('active');
+  loadPanelData();
+}
+tabFormBtn.addEventListener('click', showForm);
+tabPanelBtn.addEventListener('click', showPanel);
+
+async function applySessionState(session) {
+  if (session) {
+    tabsBar.style.display = 'flex';
+    showPanel();
+  } else {
+    tabsBar.style.display = 'none';
+    showForm();
+  }
+}
+
+sb.auth.getSession().then(({ data }) => applySessionState(data.session));
+sb.auth.onAuthStateChange((_event, session) => applySessionState(session));
+
+/* ---------- Panel: carga y gráficas ---------- */
+let charts = {};
+const PALETTE = '#2a78d6';
+
+function countBy(rows, field) {
+  const counts = {};
+  rows.forEach(r => {
+    const v = r[field] || 'Sin dato';
+    counts[v] = (counts[v] || 0) + 1;
+  });
+  return counts;
+}
+
+function renderBarChart(canvasId, counts) {
+  const labels = Object.keys(counts);
+  const values = Object.values(counts);
+  const ctx = document.getElementById(canvasId).getContext('2d');
+  if (charts[canvasId]) charts[canvasId].destroy();
+  charts[canvasId] = new Chart(ctx, {
+    type: 'bar',
+    data: { labels, datasets: [{ data: values, backgroundColor: PALETTE, borderRadius: 4, maxBarThickness: 36 }] },
+    options: {
+      plugins: { legend: { display: false }, tooltip: { enabled: true } },
+      scales: {
+        y: { beginAtZero: true, ticks: { precision: 0 }, grid: { color: '#e1e0d9' } },
+        x: { grid: { display: false } }
+      }
+    }
+  });
+}
+
+async function loadPanelData() {
+  const { data: rows, error } = await sb
+    .from('incident_reports')
+    .select('*')
+    .order('created_at', { ascending: false })
+    .limit(2000);
+
+  if (error) { console.error(error); return; }
+
+  const now = new Date();
+  const startMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+
+  document.getElementById('statTotal').textContent = rows.length;
+  document.getElementById('statMonth').textContent = rows.filter(r => new Date(r.created_at) >= startMonth).length;
+  document.getElementById('statWeek').textContent = rows.filter(r => new Date(r.created_at) >= sevenDaysAgo).length;
+
+  renderBarChart('chartArea', countBy(rows, 'area'));
+  renderBarChart('chartSede', countBy(rows, 'sede'));
+  renderBarChart('chartConsecuencia', countBy(rows, 'consecuencia_potencial'));
+  renderBarChart('chartElemento', countBy(rows, 'elemento_condicion'));
+
+  const recentBody = document.getElementById('recentBody');
+  recentBody.innerHTML = '';
+  rows.slice(0, 15).forEach(r => {
+    const tr = document.createElement('tr');
+    const desc = (r.descripcion || '').slice(0, 60);
+    tr.innerHTML = `<td>${r.fecha_evento || ''}</td><td>${r.area || ''}</td><td>${r.sede || ''}</td><td>${desc}</td>`;
+    recentBody.appendChild(tr);
+  });
+}
+</script>
+</body>
+</html>
