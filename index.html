@@ -321,11 +321,12 @@ const OPTIONS = {
 
 document.querySelectorAll('.options[data-name]').forEach(container => {
   const name = container.dataset.name;
+  const isRequired = (name === 'area' || name === 'sede');
   OPTIONS[name].forEach((opt, i) => {
     const id = name + '_' + i;
     const div = document.createElement('div');
     div.className = 'opt';
-    div.innerHTML = `<input type="radio" id="${id}" name="${name}" value="${opt}"><label for="${id}">${opt}</label>`;
+    div.innerHTML = `<input type="radio" id="${id}" name="${name}" value="${opt}"${isRequired ? ' required' : ''}><label for="${id}">${opt}</label>`;
     container.appendChild(div);
   });
 });
@@ -354,13 +355,15 @@ form.addEventListener('submit', async (e) => {
   submitBtn.disabled = false;
   submitBtn.textContent = 'Enviar';
 
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+
   if (error) {
     console.error(error);
+    errorMsg.textContent = 'No se pudo enviar el reporte: ' + (error.message || 'intenta de nuevo.');
     errorMsg.style.display = 'block';
   } else {
     successMsg.style.display = 'block';
     form.reset();
-    window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 });
 
